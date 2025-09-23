@@ -6,6 +6,7 @@ import torch.nn as nn
 class SimpleModel(nn.Module):
     def __init__(self):
         super().__init__()
+        
         # Create a fully connected layer: 4 input features -> 2 output features
         # Linear transformation: y = xW^T + b where:
         # - x is the input with 4 features
@@ -13,6 +14,16 @@ class SimpleModel(nn.Module):
         # - b is a learnable bias vector of shape (2,)
         # - y is the output with 2 features
         self.fc = nn.Linear(4, 2)
+        
+        # CALL CHAIN EXPLANATION:
+        # When you call model(batch_x), this happens:
+        # batch_y = model(batch_x)        # This line...
+        #     ↓
+        # model.__call__(batch_x)         # Calls __call__ method (inherited from nn.Module)
+        #     ↓  
+        # model.forward(batch_x)          # Which internally calls your forward() method
+        #     ↓
+        # return self.fc(batch_x)         # Your forward method implementation
 
     def forward(self, x):
         # Forward pass: defines how data flows through the model
@@ -21,17 +32,36 @@ class SimpleModel(nn.Module):
         # So self.fc(x) actually calls self.fc.__call__(x) which runs the linear layer
         return self.fc(x)
 
-# Create model instance and move it to GPU for faster computation
+# Create model instance and load pre-trained weights
 model = SimpleModel()
+
+# Load pre-trained weights from disk
+# Assumes the model was previously trained and weights were saved
+print("Loading pre-trained weights...")
+try:
+    # Load the state dict containing the learned weights W and bias b
+    state_dict = torch.load('model_weights.pth', map_location='cpu')
+    model.load_state_dict(state_dict)
+    print("✓ Pre-trained weights loaded successfully")
+    print(f"✓ Loaded weight matrix W shape: {model.fc.weight.shape}")  # Should be [2, 4]
+    print(f"✓ Loaded bias vector b shape: {model.fc.bias.shape}")      # Should be [2]
+except FileNotFoundError:
+    print("⚠️  model_weights.pth not found - using random weights for demo")
+    print("⚠️  In production, you must load trained weights for meaningful inference")
+
 # Use DataParallel for multi-GPU support if multiple GPUs available
 # Single machine only. Use DistributedDataParallel for multiple machines.
 if torch.cuda.device_count() > 1:
     print(f"Using DataParallel with {torch.cuda.device_count()} GPUs")
     model = nn.DataParallel(model)
+
+# Move model to GPU after loading weights
 model = model.to("cuda")
+
 # Set model to evaluation mode (disables dropout, batch norm training behavior)
 # Important for inference to get consistent, deterministic results
 model.eval()
+print("Model ready for inference")
 
 # ---- 2. Inference ----
 def run_inference(batch_x):
