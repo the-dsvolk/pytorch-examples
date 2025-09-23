@@ -24,6 +24,7 @@ class SimpleModel(nn.Module):
 # Create model instance and move it to GPU for faster computation
 model = SimpleModel()
 # Use DataParallel for multi-GPU support if multiple GPUs available
+# Single machine only. Use DistributedDataParallel for multiple machines.
 if torch.cuda.device_count() > 1:
     print(f"Using DataParallel with {torch.cuda.device_count()} GPUs")
     model = nn.DataParallel(model)
@@ -38,6 +39,8 @@ def run_inference(batch_x):
     # We don't need gradients since we're not training, just doing forward pass
     with torch.no_grad():
         # Move batch data from CPU to GPU memory for faster computation
+        # NOTE: With DataLoader + pin_memory=True, use batch_x.to("cuda", non_blocking=True) 
+        # for asynchronous transfers that don't block CPU while GPU transfer happens
         batch_x = batch_x.to("cuda")
         batch_y = model(batch_x)
         # CRITICAL: Move results from CUDA GPU memory back to CPU memory
@@ -49,6 +52,9 @@ def run_inference(batch_x):
         return batch_y.cpu()
 
 # ---- 3. Producer ----
+# NOTE: For real data loading (not random generation), replace this with:
+# DataLoader(dataset, batch_size=X, num_workers=4, pin_memory=True, persistent_workers=True)
+# This would enable multi-process data loading and faster CPU→GPU transfers
 async def producer(queue, n_requests=10):
     for i in range(n_requests):
         x = torch.randn(1, 4)  # one request
